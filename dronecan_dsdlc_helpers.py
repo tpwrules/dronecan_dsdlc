@@ -274,12 +274,21 @@ def mkdir_p(path):
 def build_table(msg):
     if msg.kind != msg.KIND_MESSAGE or msg.union:
         return None # not yet supported
-    fields = msg.fields
-    if len(fields) == 0:
+    if len(msg.fields) == 0:
         return None # cheaper to encode nothing without a table
 
+    table = _build_table_core(msg)
+    if table is None: return None
+
+    table.append(("0", "255")) # terminator
+
+    # format into source
+    return "\n".join(f"        {{{t[0]}, {t[1]}}}," for t in table)
+
+def _build_table_core(obj):
     table = []
-    for field in fields:
+
+    for field in obj.fields:
         t = field.type
         if isinstance(t, dronecan.dsdl.parser.PrimitiveType):
             if t.kind == t.KIND_BOOLEAN or t.kind == t.KIND_UNSIGNED_INT:
@@ -288,13 +297,17 @@ def build_table(msg):
                 # special case since there's no signed boolean
                 bitlen = 1 if t.kind == t.KIND_FLOAT and t.bitlen == 16 else t.bitlen
                 st = f"CANARD_TABLE_CODING_SIGNED | ({bitlen}-1)"
-            table.append((st, f"offsetof(struct {underscored_name(msg)}, {field.name})"))
+            table.append((st, f"offsetof(struct {underscored_name(obj)}, {field.name})"))
         elif isinstance(t, dronecan.dsdl.parser.VoidType):
             table.append((f"CANARD_TABLE_CODING_VOID | ({t.bitlen}-1)", "0"))
+        elif isinstance(t, dronecan.dsdl.parser.CompoundType):
+            sub = _build_table_core(t) # build the compound table
+            if sub is None: return None
+
+            # prepend offset to each entry
+            off = f"offsetof(struct {underscored_name(obj)}, {field.name})+"
+            table.extend((s[0], off+s[1] if s[1] != "0" else s[1]) for s in sub)
         else:
             return None # not sure how to handle
 
-    table.append(("0", "255"))
-
-    # format into source
-    return "\n".join(f"        {{{t[0]}, {t[1]}}}," for t in table)
+    return table
