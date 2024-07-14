@@ -294,5 +294,7 @@ def build_table(msg):
         else:
             return None # not sure how to handle
 
+    table.append(("0", "255"))
+
     # format into source
     return "\n".join(f"        {{{t[0]}, {t[1]}}}," for t in table)

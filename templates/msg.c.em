@@ -11,12 +11,25 @@
 #include <test_helpers.h>
 #endif
 
+@{coding_table = build_table(msg)}
+@[if coding_table is not None]
+#if CANARD_ENABLE_TABLE_CODING
+static const CanardCodeTable _table_@(msg_underscored_name) = {
+    .max_size = @(msg_define_name.upper())_MAX_SIZE,
+    .entry = {
+@(coding_table)
+    },
+};
+#endif
+@[end if]
+
 uint32_t @(msg_underscored_name)_encode(@(msg_c_type)* msg, uint8_t* buffer
 #if CANARD_ENABLE_TAO_OPTION
     , bool tao
 #endif
 ) {
-#if CANARD_TABLE_CODING_POSSIBLE_@(msg_define_name.upper())
+@[if coding_table is not None]
+#if CANARD_ENABLE_TABLE_CODING
     if (sizeof(@(msg_c_type)) < 255) {
         return canardTableEncode(&_table_@(msg_underscored_name), buffer, msg,
 #if CANARD_ENABLE_TAO_OPTION
@@ -27,6 +40,7 @@ uint32_t @(msg_underscored_name)_encode(@(msg_c_type)* msg, uint8_t* buffer
         );
     }
 #endif
+@[end if]
     uint32_t bit_ofs = 0;
     memset(buffer, 0, @(msg_define_name.upper())_MAX_SIZE);
     _@(msg_underscored_name)_encode(buffer, &bit_ofs, msg, 

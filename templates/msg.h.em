@@ -69,23 +69,6 @@ extern "C"
 {
 #endif
 
-@{coding_table = build_table(msg)}
-@[if coding_table is not None]
-#if CANARD_ENABLE_TABLE_CODING
-static const CanardCodeTable _table_@(msg_underscored_name) = {
-    .max_size = @(msg_define_name.upper())_MAX_SIZE,
-    .entry = {
-@(coding_table)
-    },
-};
-#define CANARD_TABLE_CODING_POSSIBLE_@(msg_define_name.upper()) 1
-#else
-#define CANARD_TABLE_CODING_POSSIBLE_@(msg_define_name.upper()) 0
-#endif
-@[else]
-#define CANARD_TABLE_CODING_POSSIBLE_@(msg_define_name.upper()) 0
-@[end if]
-
 uint32_t @(msg_underscored_name)_encode(@(msg_c_type)* msg, uint8_t* buffer
 #if CANARD_ENABLE_TAO_OPTION
     , bool tao
