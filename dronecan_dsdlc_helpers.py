@@ -270,3 +270,10 @@ def mkdir_p(path):
             pass
         else:
             raise
+
+def build_table(msg):
+    if msg.kind != msg.KIND_MESSAGE or msg.union:
+        return None # not yet supported
+    fields = msg.fields
+    print(fields, file=sys.stderr)
+    return None

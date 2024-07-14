@@ -16,8 +16,20 @@ uint32_t @(msg_underscored_name)_encode(@(msg_c_type)* msg, uint8_t* buffer
     , bool tao
 #endif
 ) {
+#if CANARD_TABLE_CODING_POSSIBLE_@(msg_define_name.upper())
+    if (sizeof(@(msg_c_type)) < 255) {
+        return canardTableEncode(_table_@(msg_underscored_name), buffer, msg,
+#if CANARD_ENABLE_TAO_OPTION
+        tao
+#else
+        true
+#endif
+        );
+    }
+#else
     uint32_t bit_ofs = 0;
     memset(buffer, 0, @(msg_define_name.upper())_MAX_SIZE);
+#endif
     _@(msg_underscored_name)_encode(buffer, &bit_ofs, msg, 
 #if CANARD_ENABLE_TAO_OPTION
     tao
