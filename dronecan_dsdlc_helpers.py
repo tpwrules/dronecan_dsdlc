@@ -275,5 +275,24 @@ def build_table(msg):
     if msg.kind != msg.KIND_MESSAGE or msg.union:
         return None # not yet supported
     fields = msg.fields
-    print(fields, file=sys.stderr)
-    return None
+    if len(fields) == 0:
+        return None # cheaper to encode nothing without a table
+
+    table = []
+    for field in fields:
+        t = field.type
+        if isinstance(t, dronecan.dsdl.parser.PrimitiveType):
+            if t.kind == t.KIND_BOOLEAN or t.kind == t.KIND_UNSIGNED_INT:
+                st = f"CANARD_TABLE_CODING_UNSIGNED | ({t.bitlen}-1)"
+            elif t.kind == t.KIND_SIGNED_INT or t.kind == t.KIND_FLOAT:
+                # special case since there's no signed boolean
+                bitlen = 1 if t.kind == t.KIND_FLOAT and t.bitlen == 16 else t.bitlen
+                st = f"CANARD_TABLE_CODING_SIGNED | ({bitlen}-1)"
+            table.append((st, f"offsetof(struct {underscored_name(msg)}, {field.name})"))
+        elif isinstance(t, dronecan.dsdl.parser.VoidType):
+            table.append((f"CANARD_TABLE_CODING_VOID | ({t.bitlen}-1)", "0"))
+        else:
+            return None # not sure how to handle
+
+    # format into source
+    return "\n".join(f"        {{{t[0]}, {t[1]}}}," for t in table)

@@ -78,7 +78,7 @@ static const CanardCodeTable _table_@(msg_underscored_name) = {
 @(coding_table)
     },
 };
-#define CANARD_TABLE_CODING_POSSIBLE_@(msg_define_name.upper()) @(1 if possible else 0)
+#define CANARD_TABLE_CODING_POSSIBLE_@(msg_define_name.upper()) 1
 #else
 #define CANARD_TABLE_CODING_POSSIBLE_@(msg_define_name.upper()) 0
 #endif
