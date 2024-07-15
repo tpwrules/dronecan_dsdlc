@@ -278,16 +278,14 @@ def build_table(msg_underscored_name, msg_union, msg_fields):
     table = _build_table_core(msg_underscored_name, msg_union, msg_fields)
     if table is None: return None
 
-    # search for the last array and mark it eligible for TAO if possible
-    array_idx = len(table)-1
-    for offset, type_extra, bitlen, *extra in table[::-1]:
-        if type_extra == "CANARD_TABLE_CODING_ARRAY_DYNAMIC":
-            break
-        array_idx -= 1
-    if array_idx != -1 and table[array_idx][3] >= 8:
-        num_entries = int(table[array_idx][2])
-        if num_entries == len(table)-array_idx-3: # this is actually the last thing
-            table[array_idx] = (table[array_idx][0], "CANARD_TABLE_CODING_ARRAY_DYNAMIC_TAO", table[array_idx][2])
+    # TAO applies to the first dynamic array that encompasses the rest of the payload
+    # (not sure about unions yet)
+    candidate_arrays = []
+    for idx, (offset, type_extra, bitlen, *extra) in enumerate(table):
+        if type_extra == "CANARD_TABLE_CODING_ARRAY_DYNAMIC" and extra[0] >= 8:
+            num_entries = int(bitlen)
+            if num_entries == len(table)-idx-3:
+                table[idx] = (table[idx][0], "CANARD_TABLE_CODING_ARRAY_DYNAMIC_TAO", table[idx][2])
 
     return table
 
