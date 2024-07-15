@@ -272,11 +272,24 @@ def mkdir_p(path):
             raise
 
 def build_table(msg):
+    if msg.kind != msg.KIND_MESSAGE:
+        return None
     if msg.kind == msg.KIND_MESSAGE and len(msg.fields) == 0:
         return None # cheaper to encode nothing without a table
 
     table = _build_table_core(msg)
     if table is None: return None
+
+    # search for the last array and mark it eligible for TAO if possible
+    array_idx = len(table)-1
+    for offset, type_extra, bitlen, *extra in table[::-1]:
+        if type_extra == "CANARD_TABLE_CODING_ARRAY_DYNAMIC":
+            break
+        array_idx -= 1
+    if array_idx != -1 and table[array_idx][3] >= 8:
+        num_entries = int(table[array_idx][2])
+        if num_entries == len(table)-array_idx-3: # this is actually the last thing
+            table[array_idx] = (table[array_idx][0], "CANARD_TABLE_CODING_ARRAY_DYNAMIC_TAO", table[array_idx][2])
 
     return table
 
@@ -325,7 +338,23 @@ def _build_table_core(obj):
             table.append((offset, "CANARD_TABLE_CODING_ARRAY_STATIC", str(len(sub))))
             table.append((f"sizeof({dronecan_type_to_ctype(t.value_type)})", "0", f"{t.max_size}-1"))
             table.extend(sub)
+        elif isinstance(t, dronecan.dsdl.parser.ArrayType) and t.mode == t.MODE_DYNAMIC:
+            if t.max_size > 65535: return None # too big to encode
+
+            sub = _build_table_core(t.value_type)
+            if sub is None: return None
+            if len(sub) == 0: # array of empty objects???
+                assert False
+            if len(sub) > 255: # too many entries
+                return None
+
+            # stolen from field_cdef
+            ddef = 'struct { uint%u_t len; %s data[%u]; }' % (c_int_type_bitlen(array_len_field_bitlen(t)), dronecan_type_to_ctype(t.value_type), t.max_size)
+            table.append((f"{offset}+offsetof({ddef}, data)", "CANARD_TABLE_CODING_ARRAY_DYNAMIC", str(len(sub)), t.value_type.get_min_bitlen()))
+            table.append((f"sizeof({dronecan_type_to_ctype(t.value_type)})", "0", f"({t.max_size}-1)&0xFF"))
+            table.append((f"{offset}+offsetof({ddef}, len)", f"{t.max_size.bit_length()}", f"({t.max_size}-1)>>8"))
+            table.extend(sub)
         else:
-            return None # unsupported type
+            assert False # unknown type
 
     return table
