@@ -281,8 +281,8 @@ def build_table(msg_underscored_name, msg_union, msg_fields):
     # TAO applies to the first dynamic array that encompasses the rest of the payload
     # (not sure about unions yet)
     candidate_arrays = []
-    for idx, (offset, type_extra, bitlen, *extra) in enumerate(table):
-        if type_extra == "CANARD_TABLE_CODING_ARRAY_DYNAMIC" and extra[0] >= 8:
+    for idx, (offset, type_extra, bitlen, flag) in enumerate(table):
+        if type_extra == "CANARD_TABLE_CODING_ARRAY_DYNAMIC" and flag >= 8:
             num_entries = int(bitlen)
             if num_entries == len(table)-idx-3:
                 table[idx] = (table[idx][0], "CANARD_TABLE_CODING_ARRAY_DYNAMIC_TAO", table[idx][2])
@@ -309,15 +309,19 @@ def _build_table_core(obj_underscored_name, obj_union, obj_fields):
                 ts = "CANARD_TABLE_CODING_SIGNED"
             elif t.kind == t.KIND_FLOAT:
                 ts = "CANARD_TABLE_CODING_FLOAT"
-            table.append((offset, ts, str(t.bitlen)))
+            table.append((offset, ts, str(t.bitlen), False))
         elif isinstance(t, dronecan.dsdl.parser.VoidType):
-            table.append(("0", "CANARD_TABLE_CODING_VOID", str(t.bitlen)))
+            table.append(("0", "CANARD_TABLE_CODING_VOID", str(t.bitlen), True))
         elif isinstance(t, dronecan.dsdl.parser.CompoundType):
             sub = _build_table_core(field_name, t.union, t.fields) # build the compound table
             if sub is None: return None
 
             # prepend offset to each entry
-            table.extend((f"{offset}+{s[0]}", *s[1:]) for s in sub)
+            for s_offset, s_type_extra, s_bitlen, s_flag in sub:
+                if s_flag is not True: # not relative, needs offset adjusted
+                    table.append((f"{offset}+{s_offset}", s_type_extra, s_bitlen, s_flag))
+                else:
+                    table.append((s_offset, s_type_extra, s_bitlen, s_flag))
         elif isinstance(t, dronecan.dsdl.parser.ArrayType) and t.mode == t.MODE_STATIC:
             if t.max_size > 256: return None # too big to encode
 
@@ -331,9 +335,11 @@ def _build_table_core(obj_underscored_name, obj_union, obj_fields):
             if len(sub) > 255: # too many entries
                 return None
 
-            table.append((offset, "CANARD_TABLE_CODING_ARRAY_STATIC", str(len(sub))))
-            table.append((f"sizeof({dronecan_type_to_ctype(t.value_type)})", "0", f"{t.max_size}-1"))
-            table.extend(sub)
+            table.append((offset, "CANARD_TABLE_CODING_ARRAY_STATIC", str(len(sub)), False))
+            table.append((f"sizeof({dronecan_type_to_ctype(t.value_type)})", "0", f"{t.max_size}-1", True))
+            for s_offset, s_type_extra, s_bitlen, s_flag in sub:
+                if s_flag is False: s_flag = True
+                table.append((s_offset, s_type_extra, s_bitlen, s_flag))
         elif isinstance(t, dronecan.dsdl.parser.ArrayType) and t.mode == t.MODE_DYNAMIC:
             if t.max_size > 65535: return None # too big to encode
 
@@ -350,9 +356,11 @@ def _build_table_core(obj_underscored_name, obj_union, obj_fields):
             # stolen from field_cdef
             ddef = 'struct { uint%u_t len; %s data[%u]; }' % (c_int_type_bitlen(array_len_field_bitlen(t)), dronecan_type_to_ctype(t.value_type), t.max_size)
             table.append((f"{offset}+offsetof({ddef}, data)", "CANARD_TABLE_CODING_ARRAY_DYNAMIC", str(len(sub)), t.value_type.get_min_bitlen()))
-            table.append((f"sizeof({dronecan_type_to_ctype(t.value_type)})", "0", f"({t.max_size}-1)&0xFF"))
-            table.append((f"{offset}+offsetof({ddef}, len)", f"{t.max_size.bit_length()}", f"({t.max_size}-1)>>8"))
-            table.extend(sub)
+            table.append((f"sizeof({dronecan_type_to_ctype(t.value_type)})", "0", f"({t.max_size}-1)&0xFF", True))
+            table.append((f"{offset}+offsetof({ddef}, len)", f"{t.max_size.bit_length()}", f"({t.max_size}-1)>>8", False))
+            for s_offset, s_type_extra, s_bitlen, s_flag in sub:
+                if s_flag is False: s_flag = True
+                table.append((s_offset, s_type_extra, s_bitlen, s_flag))
         else:
             assert False # unknown type
 
