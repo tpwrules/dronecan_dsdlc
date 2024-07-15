@@ -69,11 +69,44 @@ extern "C"
 {
 #endif
 
-uint32_t @(msg_underscored_name)_encode(@(msg_c_type)* msg, uint8_t* buffer
+uint32_t __@(msg_underscored_name)_encode(@(msg_c_type)* msg, uint8_t* buffer
 #if CANARD_ENABLE_TAO_OPTION
     , bool tao
 #endif
 );
+
+@{coding_table = build_table(msg)}
+@[if coding_table is not None]
+extern const CanardCodeTable _table_@(msg_underscored_name);
+@[end if]
+
+static inline uint32_t @(msg_underscored_name)_encode(@(msg_c_type)* msg, uint8_t* buffer
+#if CANARD_ENABLE_TAO_OPTION
+    , bool tao
+#endif
+) {
+@[if coding_table is not None]
+#if CANARD_ENABLE_TABLE_CODING
+    if (sizeof(@(msg_c_type)) < 65536) {
+        return canardTableEncode(&_table_@(msg_underscored_name), buffer, msg,
+#if CANARD_ENABLE_TAO_OPTION
+        tao
+#else
+        true
+#endif
+        );
+    }
+#endif
+@[end if]
+    return __@(msg_underscored_name)_encode(msg, buffer,
+#if CANARD_ENABLE_TAO_OPTION
+    tao
+#else
+    true
+#endif
+    );
+}
+
 bool @(msg_underscored_name)_decode(const CanardRxTransfer* transfer, @(msg_c_type)* msg);
 
 #if defined(CANARD_DSDLC_INTERNAL)
