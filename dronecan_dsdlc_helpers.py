@@ -271,13 +271,11 @@ def mkdir_p(path):
         else:
             raise
 
-def build_table(msg):
-    if msg.kind != msg.KIND_MESSAGE:
-        return None
-    if msg.kind == msg.KIND_MESSAGE and len(msg.fields) == 0:
+def build_table(msg_underscored_name, msg_union, msg_fields):
+    if len(msg_fields) == 0:
         return None # cheaper to encode nothing without a table
 
-    table = _build_table_core(msg)
+    table = _build_table_core(msg_underscored_name, msg_union, msg_fields)
     if table is None: return None
 
     # search for the last array and mark it eligible for TAO if possible
@@ -293,22 +291,19 @@ def build_table(msg):
 
     return table
 
-def _build_table_core(obj):
-    if isinstance(obj, dronecan.dsdl.parser.CompoundType):
-        if obj.kind != obj.KIND_MESSAGE or obj.union:
-            return None # not yet supported
-        fields = obj.fields
-    else:
-        fields = [obj]
+def _build_table_core(obj_underscored_name, obj_union, obj_fields):
+    if obj_union:
+        return None # not yet supported
 
     table = []
-    for field in fields:
+    for field in obj_fields:
         if isinstance(field, dronecan.dsdl.parser.Type):
             t = field
             offset = "0"
         else:
             t = field.type
-            offset = f"offsetof(struct {underscored_name(obj)}, {field.name})"
+            offset = f"offsetof(struct {obj_underscored_name}, {field.name})"
+        field_name = t.full_name.replace('.', '_').split("[")[0] # hack
         if isinstance(t, dronecan.dsdl.parser.PrimitiveType):
             if t.kind == t.KIND_BOOLEAN or t.kind == t.KIND_UNSIGNED_INT:
                 ts = "CANARD_TABLE_CODING_UNSIGNED"
@@ -320,15 +315,18 @@ def _build_table_core(obj):
         elif isinstance(t, dronecan.dsdl.parser.VoidType):
             table.append(("0", "CANARD_TABLE_CODING_VOID", str(t.bitlen)))
         elif isinstance(t, dronecan.dsdl.parser.CompoundType):
-            sub = _build_table_core(t) # build the compound table
+            sub = _build_table_core(field_name, t.union, t.fields) # build the compound table
             if sub is None: return None
 
             # prepend offset to each entry
-            table.extend((f"{offset}+{s[0]}", s[1], s[2]) for s in sub)
+            table.extend((f"{offset}+{s[0]}", *s[1:]) for s in sub)
         elif isinstance(t, dronecan.dsdl.parser.ArrayType) and t.mode == t.MODE_STATIC:
             if t.max_size > 256: return None # too big to encode
 
-            sub = _build_table_core(t.value_type)
+            if isinstance(t.value_type, dronecan.dsdl.parser.CompoundType):
+                sub = _build_table_core(field_name, t.value_type.union, t.value_type.fields)
+            else:
+                sub = _build_table_core(field_name, False, [t.value_type])
             if sub is None: return None
             if len(sub) == 0: # array of empty objects???
                 assert False
@@ -341,7 +339,10 @@ def _build_table_core(obj):
         elif isinstance(t, dronecan.dsdl.parser.ArrayType) and t.mode == t.MODE_DYNAMIC:
             if t.max_size > 65535: return None # too big to encode
 
-            sub = _build_table_core(t.value_type)
+            if isinstance(t.value_type, dronecan.dsdl.parser.CompoundType):
+                sub = _build_table_core(field_name, t.value_type.union, t.value_type.fields)
+            else:
+                sub = _build_table_core(field_name, False, [t.value_type])
             if sub is None: return None
             if len(sub) == 0: # array of empty objects???
                 assert False

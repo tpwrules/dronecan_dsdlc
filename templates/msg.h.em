@@ -75,7 +75,7 @@ uint32_t __@(msg_underscored_name)_encode(@(msg_c_type)* msg, uint8_t* buffer
 #endif
 );
 
-@{coding_table = build_table(msg)}
+@{coding_table = build_table(msg_underscored_name, msg_union, msg_fields)}
 @[if coding_table is not None]
 extern const CanardCodeTable _table_@(msg_underscored_name);
 @[end if]

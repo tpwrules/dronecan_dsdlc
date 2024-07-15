@@ -11,7 +11,7 @@
 #include <test_helpers.h>
 #endif
 
-@{coding_table = build_table(msg)}
+@{coding_table = build_table(msg_underscored_name, msg_union, msg_fields)}
 @[if coding_table is not None]
 #if CANARD_ENABLE_TABLE_CODING
 const CanardCodeTable _table_@(msg_underscored_name) = {
