@@ -277,13 +277,7 @@ def build_table(msg):
     if len(msg.fields) == 0:
         return None # cheaper to encode nothing without a table
 
-    table = _build_table_core(msg)
-    if table is None: return None
-
-    table.append(("0", "255")) # terminator
-
-    # format into source
-    return "\n".join(f"        {{{t[0]}, {t[1]}}}," for t in table)
+    return _build_table_core(msg)
 
 def _build_table_core(obj):
     table = []
@@ -292,21 +286,21 @@ def _build_table_core(obj):
         t = field.type
         if isinstance(t, dronecan.dsdl.parser.PrimitiveType):
             if t.kind == t.KIND_BOOLEAN or t.kind == t.KIND_UNSIGNED_INT:
-                st = f"CANARD_TABLE_CODING_UNSIGNED | ({t.bitlen}-1)"
-            elif t.kind == t.KIND_SIGNED_INT or t.kind == t.KIND_FLOAT:
-                # special case since there's no signed boolean
-                bitlen = 1 if t.kind == t.KIND_FLOAT and t.bitlen == 16 else t.bitlen
-                st = f"CANARD_TABLE_CODING_SIGNED | ({bitlen}-1)"
-            table.append((st, f"offsetof(struct {underscored_name(obj)}, {field.name})"))
+                ts = "CANARD_TABLE_CODING_UNSIGNED"
+            elif t.kind == t.KIND_SIGNED_INT:
+                ts = "CANARD_TABLE_CODING_SIGNED"
+            elif t.kind == t.KIND_FLOAT:
+                ts = "CANARD_TABLE_CODING_FLOAT"
+            table.append((f"offsetof(struct {underscored_name(obj)}, {field.name})", ts, str(t.bitlen)))
         elif isinstance(t, dronecan.dsdl.parser.VoidType):
-            table.append((f"CANARD_TABLE_CODING_VOID | ({t.bitlen}-1)", "0"))
+            table.append(("0", "CANARD_TABLE_CODING_VOID", str(t.bitlen)))
         elif isinstance(t, dronecan.dsdl.parser.CompoundType):
             sub = _build_table_core(t) # build the compound table
             if sub is None: return None
 
             # prepend offset to each entry
             off = f"offsetof(struct {underscored_name(obj)}, {field.name})+"
-            table.extend((s[0], off+s[1] if s[1] != "0" else s[1]) for s in sub)
+            table.extend((off+s[0], s[1], s[2]) for s in sub)
         else:
             return None # not sure how to handle
 

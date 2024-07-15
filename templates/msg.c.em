@@ -16,8 +16,9 @@
 #if CANARD_ENABLE_TABLE_CODING
 static const CanardCodeTable _table_@(msg_underscored_name) = {
     .max_size = @(msg_define_name.upper())_MAX_SIZE,
-    .entry = {
-@(coding_table)
+    .num_entries = @(len(coding_table)),
+    .entries = {
+@("\n".join(f"        {{{t[0]}, {t[1]}, {t[2]}}}," for t in coding_table))
     },
 };
 #endif
@@ -30,7 +31,7 @@ uint32_t @(msg_underscored_name)_encode(@(msg_c_type)* msg, uint8_t* buffer
 ) {
 @[if coding_table is not None]
 #if CANARD_ENABLE_TABLE_CODING
-    if (sizeof(@(msg_c_type)) < 255) {
+    if (sizeof(@(msg_c_type)) < 65536) {
         return canardTableEncode(&_table_@(msg_underscored_name), buffer, msg,
 #if CANARD_ENABLE_TAO_OPTION
         tao
