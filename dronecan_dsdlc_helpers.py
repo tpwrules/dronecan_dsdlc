@@ -272,18 +272,30 @@ def mkdir_p(path):
             raise
 
 def build_table(msg):
-    if msg.kind != msg.KIND_MESSAGE or msg.union:
-        return None # not yet supported
-    if len(msg.fields) == 0:
+    if msg.kind == msg.KIND_MESSAGE and len(msg.fields) == 0:
         return None # cheaper to encode nothing without a table
 
-    return _build_table_core(msg)
+    table = _build_table_core(msg)
+    if table is None: return None
+
+    return table
 
 def _build_table_core(obj):
-    table = []
+    if isinstance(obj, dronecan.dsdl.parser.CompoundType):
+        if obj.kind != obj.KIND_MESSAGE or obj.union:
+            return None # not yet supported
+        fields = obj.fields
+    else:
+        fields = [obj]
 
-    for field in obj.fields:
-        t = field.type
+    table = []
+    for field in fields:
+        if isinstance(field, dronecan.dsdl.parser.Type):
+            t = field
+            offset = "0"
+        else:
+            t = field.type
+            offset = f"offsetof(struct {underscored_name(obj)}, {field.name})"
         if isinstance(t, dronecan.dsdl.parser.PrimitiveType):
             if t.kind == t.KIND_BOOLEAN or t.kind == t.KIND_UNSIGNED_INT:
                 ts = "CANARD_TABLE_CODING_UNSIGNED"
@@ -291,7 +303,7 @@ def _build_table_core(obj):
                 ts = "CANARD_TABLE_CODING_SIGNED"
             elif t.kind == t.KIND_FLOAT:
                 ts = "CANARD_TABLE_CODING_FLOAT"
-            table.append((f"offsetof(struct {underscored_name(obj)}, {field.name})", ts, str(t.bitlen)))
+            table.append((offset, ts, str(t.bitlen)))
         elif isinstance(t, dronecan.dsdl.parser.VoidType):
             table.append(("0", "CANARD_TABLE_CODING_VOID", str(t.bitlen)))
         elif isinstance(t, dronecan.dsdl.parser.CompoundType):
@@ -299,9 +311,21 @@ def _build_table_core(obj):
             if sub is None: return None
 
             # prepend offset to each entry
-            off = f"offsetof(struct {underscored_name(obj)}, {field.name})+"
-            table.extend((off+s[0], s[1], s[2]) for s in sub)
+            table.extend((f"{offset}+{s[0]}", s[1], s[2]) for s in sub)
+        elif isinstance(t, dronecan.dsdl.parser.ArrayType) and t.mode == t.MODE_STATIC:
+            if t.max_size > 256: return None # too big to encode
+
+            sub = _build_table_core(t.value_type)
+            if sub is None: return None
+            if len(sub) == 0: # array of empty objects???
+                assert False
+            if len(sub) > 255: # too many entries
+                return None
+
+            table.append((offset, "CANARD_TABLE_CODING_ARRAY_STATIC", str(len(sub))))
+            table.append((f"sizeof({dronecan_type_to_ctype(t.value_type)})", "0", f"{t.max_size}-1"))
+            table.extend(sub)
         else:
-            return None # not sure how to handle
+            return None # unsupported type
 
     return table
