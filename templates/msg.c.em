@@ -39,6 +39,13 @@ uint32_t __@(msg_underscored_name)_encode(@(msg_c_type)* msg, uint8_t* buffer
   return true if the decode is invalid
  */
 bool @(msg_underscored_name)_decode(const CanardRxTransfer* transfer, @(msg_c_type)* msg) {
+@[if coding_table is not None]
+#if CANARD_ENABLE_TABLE_CODING
+    if (sizeof(@(msg_c_type)) < 65536) {
+        return canardTableDecode(&_table_@(msg_underscored_name), transfer, msg);
+    }
+#endif
+@[end if]
 #if CANARD_ENABLE_TAO_OPTION
     if (transfer->tao && (transfer->payload_len > @(msg_define_name.upper())_MAX_SIZE)) {
         return true; /* invalid payload length */
