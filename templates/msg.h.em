@@ -69,12 +69,28 @@ extern "C"
 {
 #endif
 
-uint32_t @(msg_underscored_name)_encode(@(msg_c_type)* msg, uint8_t* buffer
+uint32_t _@(msg_underscored_name)_encode(@(msg_c_type)* msg, uint8_t* buffer
 #if CANARD_ENABLE_TAO_OPTION
     , bool tao
 #endif
 );
-bool @(msg_underscored_name)_decode(const CanardRxTransfer* transfer, @(msg_c_type)* msg);
+bool _@(msg_underscored_name)_decode(const CanardRxTransfer* transfer, @(msg_c_type)* msg);
+
+static inline uint32_t @(msg_underscored_name)_encode(@(msg_c_type)* msg, uint8_t* buffer
+#if CANARD_ENABLE_TAO_OPTION
+    , bool tao
+#endif
+) {
+    return _@(msg_underscored_name)_encode(msg, buffer
+#if CANARD_ENABLE_TAO_OPTION
+    , tao
+#endif
+    );
+}
+
+static inline bool @(msg_underscored_name)_decode(const CanardRxTransfer* transfer, @(msg_c_type)* msg) {
+    return _@(msg_underscored_name)_decode(transfer, msg);
+}
 
 #if defined(CANARD_DSDLC_INTERNAL)
 @{indent = 0}@{ind = '    '*indent}@
