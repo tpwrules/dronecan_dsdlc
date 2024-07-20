@@ -81,11 +81,21 @@ static inline uint32_t @(msg_underscored_name)_encode(@(msg_c_type)* msg, uint8_
     , bool tao
 #endif
 ) {
+@[if msg_max_bitlen == 0]
+    (void)msg;
+    (void)buffer;
+#if CANARD_ENABLE_TAO_OPTION
+    (void)tao;
+#endif
+
+    return 0; // 0-length message encodes to 0 bytes
+@[else]
     return _@(msg_underscored_name)_encode(msg, buffer
 #if CANARD_ENABLE_TAO_OPTION
     , tao
 #endif
     );
+@[end if]
 }
 
 static inline bool @(msg_underscored_name)_decode(const CanardRxTransfer* transfer, @(msg_c_type)* msg) {
