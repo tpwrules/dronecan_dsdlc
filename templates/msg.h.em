@@ -99,7 +99,14 @@ static inline uint32_t @(msg_underscored_name)_encode(@(msg_c_type)* msg, uint8_
 }
 
 static inline bool @(msg_underscored_name)_decode(const CanardRxTransfer* transfer, @(msg_c_type)* msg) {
+@[if msg_max_bitlen == 0]
+    (void)msg;
+
+    // all transports accurately convey a payload length of 0 bytes so any payload is an error
+    return transfer->payload_len != 0;
+@[else]
     return _@(msg_underscored_name)_decode(transfer, msg);
+@[end if]
 }
 
 #if defined(CANARD_DSDLC_INTERNAL)
