@@ -18,7 +18,7 @@ uint32_t @(msg_underscored_name)_encode(@(msg_c_type)* msg, uint8_t* buffer
 ) {
     uint32_t bit_ofs = 0;
     memset(buffer, 0, @(msg_define_name.upper())_MAX_SIZE);
-    _@(msg_underscored_name)_encode(buffer, &bit_ofs, msg, 
+    __@(msg_underscored_name)_encode(buffer, &bit_ofs, msg,
 #if CANARD_ENABLE_TAO_OPTION
     tao
 #else
@@ -38,7 +38,7 @@ bool @(msg_underscored_name)_decode(const CanardRxTransfer* transfer, @(msg_c_ty
     }
 #endif
     uint32_t bit_ofs = 0;
-    if (_@(msg_underscored_name)_decode(transfer, &bit_ofs, msg,
+    if (__@(msg_underscored_name)_decode(transfer, &bit_ofs, msg,
 #if CANARD_ENABLE_TAO_OPTION
     transfer->tao
 #else
