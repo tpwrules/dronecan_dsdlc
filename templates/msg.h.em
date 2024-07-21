@@ -89,8 +89,7 @@ void _@(msg_underscored_name)_encode(uint8_t* buffer, uint32_t* bit_ofs, @(msg_c
 
 @[  if msg_union]@
 @(ind)@(union_msg_tag_uint_type_from_num_fields(len(msg_fields))) union_tag = msg->union_tag;
-@(ind)canardEncodeScalar(buffer, *bit_ofs, @(union_msg_tag_bitlen_from_num_fields(len(msg_fields))), &union_tag);
-@(ind)*bit_ofs += @(union_msg_tag_bitlen_from_num_fields(len(msg_fields)));
+@(ind)canardEncodeNextScalar(buffer, bit_ofs, @(union_msg_tag_bitlen_from_num_fields(len(msg_fields))), &union_tag);
 
 @(ind)switch(msg->union_tag) {
 @{indent += 1}@{ind = '    '*indent}@
@@ -106,12 +105,11 @@ void _@(msg_underscored_name)_encode(uint8_t* buffer, uint32_t* bit_ofs, @(msg_c
 @[        if field.type.kind == field.type.KIND_FLOAT and field.type.bitlen == 16]@
 @(ind){
 @(ind)    uint16_t float16_val = canardConvertNativeFloatToFloat16(msg->@(field.name));
-@(ind)    canardEncodeScalar(buffer, *bit_ofs, @(field.type.bitlen), &float16_val);
+@(ind)    canardEncodeNextScalar(buffer, bit_ofs, @(field.type.bitlen), &float16_val);
 @(ind)}
 @[        else]@
-@(ind)canardEncodeScalar(buffer, *bit_ofs, @(field.type.bitlen), &msg->@(field.name));
+@(ind)canardEncodeNextScalar(buffer, bit_ofs, @(field.type.bitlen), &msg->@(field.name));
 @[        end if]@
-@(ind)*bit_ofs += @(field.type.bitlen);
 @[      elif field.type.category == field.type.CATEGORY_ARRAY]@
 @[        if field.type.mode == field.type.MODE_DYNAMIC]@
 #pragma GCC diagnostic push
@@ -122,8 +120,7 @@ void _@(msg_underscored_name)_encode(uint8_t* buffer, uint32_t* bit_ofs, @(msg_c
 @(ind)if (!tao) {
 @{indent += 1}@{ind = '    '*indent}@
 @[          end if]@
-@(ind)canardEncodeScalar(buffer, *bit_ofs, @(array_len_field_bitlen(field.type)), &@(field.name)_len);
-@(ind)*bit_ofs += @(array_len_field_bitlen(field.type));
+@(ind)canardEncodeNextScalar(buffer, bit_ofs, @(array_len_field_bitlen(field.type)), &@(field.name)_len);
 @[          if field == msg_fields[-1] and field.type.value_type.get_min_bitlen() >= 8]@
 @{indent -= 1}@{ind = '    '*indent}@
 @(ind)}
@@ -137,12 +134,11 @@ void _@(msg_underscored_name)_encode(uint8_t* buffer, uint32_t* bit_ofs, @(msg_c
 @[          if field.type.value_type.kind == field.type.value_type.KIND_FLOAT and field.type.value_type.bitlen == 16]@
 @(ind){
 @(ind)    uint16_t float16_val = canardConvertNativeFloatToFloat16(msg->@(field_get_data(field))[i]);
-@(ind)    canardEncodeScalar(buffer, *bit_ofs, @(field.type.value_type.bitlen), &float16_val);
+@(ind)    canardEncodeNextScalar(buffer, bit_ofs, @(field.type.value_type.bitlen), &float16_val);
 @(ind)}
 @[          else]@
-@(ind)canardEncodeScalar(buffer, *bit_ofs, @(field.type.value_type.bitlen), &msg->@(field_get_data(field))[i]);
+@(ind)canardEncodeNextScalar(buffer, bit_ofs, @(field.type.value_type.bitlen), &msg->@(field_get_data(field))[i]);
 @[          end if]@
-@(ind)*bit_ofs += @(field.type.value_type.bitlen);
 @[        elif field.type.value_type.category == field.type.value_type.CATEGORY_COMPOUND]@
 @(ind)_@(underscored_name(field.type.value_type))_encode(buffer, bit_ofs, &msg->@(field_get_data(field))[i], @[if field == msg_fields[-1] and field.type.value_type.get_min_bitlen() < 8]tao && i==msg->@(field.name).len@[else]false@[end if]@);
 @[        end if]@
@@ -175,8 +171,7 @@ bool _@(msg_underscored_name)_decode(const CanardRxTransfer* transfer, uint32_t*
 @(ind)(void)tao;
 @[  if msg_union]@
 @(ind)@(union_msg_tag_uint_type_from_num_fields(len(msg_fields))) union_tag;
-@(ind)canardDecodeScalar(transfer, *bit_ofs, @(union_msg_tag_bitlen_from_num_fields(len(msg_fields))), false, &union_tag);
-@(ind)*bit_ofs += @(union_msg_tag_bitlen_from_num_fields(len(msg_fields)));
+@(ind)canardDecodeNextScalar(transfer, bit_ofs, @(union_msg_tag_bitlen_from_num_fields(len(msg_fields))), false, &union_tag);
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wtype-limits"
 @(ind)if (union_tag >= @(len(msg_fields))) {
@@ -199,21 +194,19 @@ bool _@(msg_underscored_name)_decode(const CanardRxTransfer* transfer, uint32_t*
 @[        if field.type.kind == field.type.KIND_FLOAT and field.type.bitlen == 16]@
 @(ind){
 @(ind)    uint16_t float16_val;
-@(ind)    canardDecodeScalar(transfer, *bit_ofs, @(field.type.bitlen), @('true' if dronecan_type_is_signed(field.type) else 'false'), &float16_val);
+@(ind)    canardDecodeNextScalar(transfer, bit_ofs, @(field.type.bitlen), @('true' if dronecan_type_is_signed(field.type) else 'false'), &float16_val);
 @(ind)    msg->@(field.name) = canardConvertFloat16ToNativeFloat(float16_val);
 @(ind)}
 @[        else]@
-@(ind)canardDecodeScalar(transfer, *bit_ofs, @(field.type.bitlen), @('true' if dronecan_type_is_signed(field.type) else 'false'), &msg->@(field.name));
+@(ind)canardDecodeNextScalar(transfer, bit_ofs, @(field.type.bitlen), @('true' if dronecan_type_is_signed(field.type) else 'false'), &msg->@(field.name));
 @[        end if]@
-@(ind)*bit_ofs += @(field.type.bitlen);
 @[      elif field.type.category == field.type.CATEGORY_ARRAY]@
 @[        if field.type.mode == field.type.MODE_DYNAMIC]@
 @[          if field == msg_fields[-1] and field.type.value_type.get_min_bitlen() >= 8]@
 @(ind)if (!tao) {
 @{indent += 1}@{ind = '    '*indent}@
 @[          end if]@
-@(ind)canardDecodeScalar(transfer, *bit_ofs, @(array_len_field_bitlen(field.type)), false, &msg->@(field.name).len);
-@(ind)*bit_ofs += @(array_len_field_bitlen(field.type));
+@(ind)canardDecodeNextScalar(transfer, bit_ofs, @(array_len_field_bitlen(field.type)), false, &msg->@(field.name).len);
 @[          if field == msg_fields[-1] and field.type.value_type.get_min_bitlen() >= 8]@
 @{indent -= 1}@{ind = '    '*indent}@
 @[              if field.type.value_type.category == field.type.value_type.CATEGORY_PRIMITIVE]@
@@ -261,13 +254,12 @@ bool _@(msg_underscored_name)_decode(const CanardRxTransfer* transfer, uint32_t*
 @[          if field.type.value_type.kind == field.type.value_type.KIND_FLOAT and field.type.value_type.bitlen == 16]@
 @(ind){
 @(ind)    uint16_t float16_val;
-@(ind)    canardDecodeScalar(transfer, *bit_ofs, @(field.type.value_type.bitlen), @('true' if dronecan_type_is_signed(field.type.value_type) else 'false'), &float16_val);
+@(ind)    canardDecodeNextScalar(transfer, bit_ofs, @(field.type.value_type.bitlen), @('true' if dronecan_type_is_signed(field.type.value_type) else 'false'), &float16_val);
 @(ind)    msg->@(field_get_data(field))[i] = canardConvertFloat16ToNativeFloat(float16_val);
 @(ind)}
 @[          else]@
-@(ind)canardDecodeScalar(transfer, *bit_ofs, @(field.type.value_type.bitlen), @('true' if dronecan_type_is_signed(field.type.value_type) else 'false'), &msg->@(field_get_data(field))[i]);
+@(ind)canardDecodeNextScalar(transfer, bit_ofs, @(field.type.value_type.bitlen), @('true' if dronecan_type_is_signed(field.type.value_type) else 'false'), &msg->@(field_get_data(field))[i]);
 @[          end if]@
-@(ind)*bit_ofs += @(field.type.value_type.bitlen);
 @[        elif field.type.value_type.category == field.type.value_type.CATEGORY_COMPOUND]@
 @(ind)if (_@(underscored_name(field.type.value_type))_decode(transfer, bit_ofs, &msg->@(field_get_data(field))[i], @[if field == msg_fields[-1] and field.type.value_type.get_min_bitlen() < 8]tao && i==msg->@(field.name).len@[else]false@[end if]@)) {return true;}
 @[        end if]@
